@@ -107,20 +107,20 @@ add_port_mapping(#nat_upnp{ip=Ip, service_url=Url}, Protocol0, ExternalPort,
                  InternalPort, Description, Timeout) ->
 
     Protocol = string:to_upper(atom_to_list(Protocol0)),
-	Msg = "<u:AddPortMapping xmlns:u=\""
+    Msg = "<u:AddPortMapping xmlns:u=\""
           "urn:schemas-upnp-org:service:WANIPConnection:1\">"
-		  "<NewRemoteHost></NewRemoteHost>"
+          "<NewRemoteHost></NewRemoteHost>"
           "<NewExternalPort>" ++  integer_to_list(ExternalPort) ++
-	      "</NewExternalPort>"
+          "</NewExternalPort>"
           "<NewProtocol>" ++ Protocol ++ "</NewProtocol>"
-	      "<NewInternalPort>" ++ integer_to_list(InternalPort) ++
+          "<NewInternalPort>" ++ integer_to_list(InternalPort) ++
           "</NewInternalPort>"
-	      "<NewInternalClient>" ++ Ip ++ "</NewInternalClient>"
-		  "<NewEnabled>1</NewEnabled>"
+          "<NewInternalClient>" ++ Ip ++ "</NewInternalClient>"
+          "<NewEnabled>1</NewEnabled>"
           "<NewPortMappingDescription>" ++ Description ++
           "</NewPortMappingDescription>"
           "<NewLeaseDuration>" ++ integer_to_list(Timeout) ++
-		  "</NewLeaseDuration></u:AddPortMapping>",
+          "</NewLeaseDuration></u:AddPortMapping>",
 
     case soap_request(Url, "AddPortMapping", Msg) of
         {ok, _} -> ok;
