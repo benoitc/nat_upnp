@@ -1,0 +1,4 @@
+%% encoding: UTF-8
+{application,nat_upnp}.
+{packages,[]}.
+{modules,[nat_upnp,nat_upnp_proto,nat_upnp_util]}.

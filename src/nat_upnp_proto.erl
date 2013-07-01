@@ -1,0 +1,288 @@
+%%% -*- erlang -*-
+%%% This file is part of nat_upnp released under the MIT license.
+%%% See the NOTICE for more information.
+%%%
+%%% Copyright (c) 2013 Benoît Chesneau <benoitc@refuge.io>
+%%%
+
+-module(nat_upnp_proto).
+
+-include_lib("xmerl/include/xmerl.hrl").
+
+-export([discover/0,
+         discover/1,
+         status_info/1,
+         add_port_mapping/6,
+         delete_port_mapping/3]).
+
+-record(nat_upnp, {
+        service_url,
+        ip}).
+
+
+-type nat_upnp() :: #nat_upnp{}.
+-export_type([nat_upnp/0]).
+
+-define(DEFAULT_TIMEOUT, 5000).
+
+discover() ->
+    discover(?DEFAULT_TIMEOUT).
+
+discover(Timeout) ->
+    nat_upnp_util:require([inets]),
+
+    {ok, Sock} = gen_udp:open(0, [{active, once}, inet, binary]),
+
+    ST = <<"urn:schemas-upnp-org:device:InternetGatewayDevice:1" >>,
+
+    MSearch = [<<"M-SEARCH * HTTP/1.1\r\n"
+                 "HOST: 239.255.255.250:1900\r\n"
+                 "MAN: \"ssdp:discover\"\r\n"
+                 "ST: ">>,  ST, <<"\r\n"
+                 "MX: 3"
+                 "\r\n\r\n">>],
+
+    try
+        discover1(Sock, iolist_to_binary(MSearch), Timeout, 3)
+    after
+        gen_udp:close(Sock)
+    end.
+
+
+discover1(_Sock, _MSearch, _Timeout, 0) ->
+    {error, failed_discovery};
+discover1(Sock, MSearch, Timeout, Tries) ->
+    inet:setopts(Sock, [{active, once}]),
+    ok = gen_udp:send(Sock, "239.255.255.250", 1900, MSearch),
+    receive
+        {udp, _Sock, Ip, _Port, Packet} ->
+            case get_location(Packet) of
+                error ->
+                    discover1(Sock, MSearch, Timeout, Tries-1);
+                Location ->
+                    case get_service_url(binary_to_list(Location)) of
+                        {ok, Url} ->
+                            MyIp = get_myip(Ip),
+                            {ok, #nat_upnp{service_url=Url, ip=MyIp}};
+                        Error ->
+                            Error
+                    end
+            end
+    after Timeout ->
+        discover1(Sock, MSearch, Timeout, Tries-1)
+    end.
+
+
+status_info(#nat_upnp{service_url=Url}) ->
+    Message = "<u:GetStatusInfo xmlns:u=\""
+              "urn:schemas-upnp-org:service:WANIPConnection:1\">"
+              "</u:GetStatusInfo>",
+    case soap_request(Url, "GetStatusInfo", Message) of
+        {ok, Body} ->
+            {Xml, _} = xmerl_scan:string(Body, [{space, normalize}]),
+
+            [Infos | _] = xmerl_xpath:string("//s:Envelope/s:Body/"
+                                             "u:GetStatusInfoResponse", Xml),
+
+            Status = extract_txt(
+                    xmerl_xpath:string("NewConnectionStatus/text()",
+                                       Infos)
+                    ),
+
+            LastConnectionError = extract_txt(
+                    xmerl_xpath:string("NewLastConnectionError/text()",
+                                       Infos)
+                    ),
+
+            Uptime = extract_txt(
+                    xmerl_xpath:string("NewUptime/text()",
+                                       Infos)
+                    ),
+            {Status, LastConnectionError, Uptime};
+       Error ->
+           Error
+    end.
+
+add_port_mapping(#nat_upnp{ip=Ip, service_url=Url}, Protocol0, ExternalPort,
+                 InternalPort, Description, Timeout) ->
+
+    Protocol = string:to_upper(atom_to_list(Protocol0)),
+	Msg = "<u:AddPortMapping xmlns:u=\""
+          "urn:schemas-upnp-org:service:WANIPConnection:1\">"
+		  "<NewRemoteHost></NewRemoteHost>"
+          "<NewExternalPort>" ++  integer_to_list(ExternalPort) ++
+	      "</NewExternalPort>"
+          "<NewProtocol>" ++ Protocol ++ "</NewProtocol>"
+	      "<NewInternalPort>" ++ integer_to_list(InternalPort) ++
+          "</NewInternalPort>"
+	      "<NewInternalClient>" ++ Ip ++ "</NewInternalClient>"
+		  "<NewEnabled>1</NewEnabled>"
+          "<NewPortMappingDescription>" ++ Description ++
+          "</NewPortMappingDescription>"
+          "<NewLeaseDuration>" ++ integer_to_list(Timeout) ++
+		  "</NewLeaseDuration></u:AddPortMapping>",
+
+    case soap_request(Url, "AddPortMapping", Msg) of
+        {ok, _} -> ok;
+        Error -> Error
+    end.
+
+delete_port_mapping(#nat_upnp{service_url=Url}, Protocol0,
+                    ExternalPort) ->
+    Protocol = string:to_upper(atom_to_list(Protocol0)),
+    Msg = "<u:DeletePortMapping xmlns:u=\""
+          "urn:schemas-upnp-org:service:WANIPConnection:1\">"
+          "<NewRemoteHost></NewRemoteHost>"
+          "<NewExternalPort>" ++ integer_to_list(ExternalPort) ++
+          "</NewExternalPort>"
+          "<NewProtocol>" ++ Protocol ++ "</NewProtocol>"
+          "</u:DeletePortMapping>",
+
+    case soap_request(Url, "DeletePortMapping", Msg) of
+        {ok, _} -> ok;
+        Error -> Error
+    end.
+
+soap_request(Url, Function, Msg0) ->
+    Msg =  "<?xml version=\"1.0\"?>"
+           "<s:Envelope"
+           " xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\""
+           " s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
+           "<s:Body>" ++  Msg0 ++ "</s:Body></s:Envelope>",
+
+    Action = "\"urn:schemas-upnp-org:service:WANIPConnection:1#"
+             ++ Function ++ "\"",
+
+    Headers = [{"Content-Length", integer_to_list(length(Msg))},
+               {"User-Agent", "Darwin/10.0.0, UPnP/1.0, MiniUPnPc/1.3"},
+               {"SOAPAction", Action},
+               {"Connection", "close"},
+               {"Cache-Control", "no-cache"},
+               {"Pragma", "no-cache"}],
+
+
+    Req = {Url, Headers, "text/xml; charset=\"utf-8\"", Msg},
+
+    case httpc:request(post, Req, [], []) of
+        {ok, {{_, 200, _}, _, Body}} ->
+            {ok, Body};
+        {ok, {{_, Status, _}, _, _}} ->
+            {error, integer_to_list(Status)};
+        Error ->
+            Error
+    end.
+
+
+get_myip(Ip) ->
+    [{_, {MyIp, _}}|_] = nat_upnp_util:route(Ip),
+    inet_parse:ntoa(MyIp).
+
+get_location(Raw) ->
+    case erlang:decode_packet(httph_bin, Raw, []) of
+        {ok, {http_error, _}, Rest} ->
+            get_location(Rest);
+        {ok, {http_header, _, 'Location', _, Location}, _Rest} ->
+            Location;
+        {ok, {http_header, _, _H, _, _V}, Rest} ->
+            get_location(Rest);
+        _ ->
+            error
+    end.
+
+get_service_url(RootUrl) ->
+    case httpc:request(RootUrl) of
+        {ok, {{_, 200, _}, _, Body}} ->
+            {Xml, _} = xmerl_scan:string(Body, [{space, normalize}]),
+            [Device | _] = xmerl_xpath:string("//device", Xml),
+            case device_type(Device) of
+                "urn:schemas-upnp-org:device:InternetGatewayDevice:1" ->
+                    get_wan_device(Device, RootUrl);
+                _ ->
+                    {error,  no_gateway_device}
+            end;
+        {ok, {{_, StatusCode, _}, _, _}} ->
+            {error, integer_to_list(StatusCode)};
+        Error ->
+            Error
+    end.
+
+get_wan_device(D, RootUrl) ->
+    case get_device(D, "urn:schemas-upnp-org:device:WANDevice:1") of
+        {ok, D1} ->
+            get_connection_device(D1, RootUrl);
+        _ ->
+            {erro, no_wan_device}
+    end.
+
+get_connection_device(D, RootUrl) ->
+    case get_device(D, "urn:schemas-upnp-org:device:WANConnectionDevice:1") of
+        {ok, D1} ->
+            get_connection_url(D1, RootUrl);
+
+        _ ->
+            {error, no_wanconnection_device}
+    end.
+
+
+get_connection_url(D, RootUrl) ->
+    case get_service(D, "urn:schemas-upnp-org:service:WANIPConnection:1") of
+        {ok, S} ->
+            Url = extract_txt(xmerl_xpath:string("controlURL/text()",
+                                                 S)),
+            case split(RootUrl, "://") of
+                [Scheme, Rest] ->
+                    case split(Rest, "/") of
+                        [NetLoc| _] ->
+                            CtlUrl = Scheme ++ "://" ++ NetLoc ++ Url,
+                            {ok, CtlUrl};
+                        _Else ->
+                            {error, invalid_control_url}
+                    end;
+                _Else ->
+
+                    {error, invalid_control_url}
+
+            end;
+        _ ->
+            {error, no_wanipconnection}
+    end.
+
+
+get_device(Device, DeviceType) ->
+    DeviceList = xmerl_xpath:string("deviceList/device", Device),
+    find_device(DeviceList, DeviceType).
+
+find_device([], _DeviceType) ->
+    false;
+find_device([D | Rest], DeviceType) ->
+    case device_type(D) of
+        DeviceType ->
+            {ok, D};
+        _ ->
+            find_device(Rest, DeviceType)
+    end.
+
+get_service(Device, ServiceType) ->
+    ServiceList = xmerl_xpath:string("serviceList/service", Device),
+    find_service(ServiceList, ServiceType).
+
+find_service([], _ServiceType) ->
+    false;
+find_service([S | Rest], ServiceType) ->
+    case extract_txt(xmerl_xpath:string("serviceType/text()", S)) of
+        ServiceType ->
+            {ok, S};
+        _ ->
+            find_service(Rest, ServiceType)
+    end.
+
+device_type(Device) ->
+    extract_txt(xmerl_xpath:string("deviceType/text()", Device)).
+
+%% Given a xml text node, extract its text value.
+extract_txt(Xml) ->
+    [T|_] = [X#xmlText.value || X <- Xml, is_record(X, xmlText)],
+    T.
+
+split(String, Pattern) ->
+    re:split(String, Pattern, [{return, list}]).
