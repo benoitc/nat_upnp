@@ -4,3 +4,4 @@ ebin
 deps
 .DS_Store
 erl_crash.dump
+.rebar/
