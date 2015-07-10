@@ -56,7 +56,7 @@ discover1(Sock, MSearch, Timeout, Tries) ->
     ok = gen_udp:send(Sock, "239.255.255.250", 1900, MSearch),
     receive
         {udp, _Sock, Ip, _Port, Packet} ->
-            case get_location(Packet) of
+            case get_location(http_bin, Packet) of
                 error ->
                     discover1(Sock, MSearch, Timeout, Tries-1);
                 Location ->
@@ -177,14 +177,18 @@ get_myip(Ip) ->
     [{_, {MyIp, _}}|_] = nat_upnp_util:route(Ip),
     inet_parse:ntoa(MyIp).
 
-get_location(Raw) ->
-    case erlang:decode_packet(httph_bin, Raw, []) of
+get_location(Type, Raw) ->
+    case erlang:decode_packet(Type, Raw, []) of
+        {ok, {http_response, _, _Code, _Resp}, Rest} ->
+            get_location(httph_bin, Rest);
         {ok, {http_error, _}, Rest} ->
-            get_location(Rest);
+            get_location(httph_bin, Rest);
         {ok, {http_header, _, 'Location', _, Location}, _Rest} ->
             Location;
+        % {ok, {http_header, _, 'LOCATION', _, Location}, _Rest} ->
+        %     Location;
         {ok, {http_header, _, _H, _, _V}, Rest} ->
-            get_location(Rest);
+            get_location(httph_bin, Rest);
         _ ->
             error
     end.
@@ -211,7 +215,7 @@ get_wan_device(D, RootUrl) ->
         {ok, D1} ->
             get_connection_device(D1, RootUrl);
         _ ->
-            {erro, no_wan_device}
+            {error, no_wan_device}
     end.
 
 get_connection_device(D, RootUrl) ->
@@ -225,26 +229,37 @@ get_connection_device(D, RootUrl) ->
 
 
 get_connection_url(D, RootUrl) ->
-    case get_service(D, "urn:schemas-upnp-org:service:WANIPConnection:1") of
-        {ok, S} ->
-            Url = extract_txt(xmerl_xpath:string("controlURL/text()",
-                                                 S)),
-            case split(RootUrl, "://") of
-                [Scheme, Rest] ->
-                    case split(Rest, "/") of
-                        [NetLoc| _] ->
-                            CtlUrl = Scheme ++ "://" ++ NetLoc ++ Url,
-                            {ok, CtlUrl};
-                        _Else ->
-                            {error, invalid_control_url}
-                    end;
-                _Else ->
-
-                    {error, invalid_control_url}
-
+    case get_service_url(D, "urn:schemas-upnp-org:service:WANIPConnection:1", RootUrl) of
+        Resp = {ok, _}  ->  Resp;
+        {error, no_service_url} ->
+            case get_service_url(D, "urn:schemas-upnp-org:service:WANPPPConnection:1", RootUrl) of
+                Resp = {ok, _}  ->  Resp;
+                Resp = {error, _} -> Resp
             end;
+        Resp = {error, _} -> Resp
+    end.
+
+get_service_url(D, Urn, RootUrl) ->
+    case get_service(D, Urn) of
+        {ok, S} ->
+            Url = extract_txt(xmerl_xpath:string("controlURL/text()", S)),
+            get_control_url(Url, RootUrl);
         _ ->
-            {error, no_wanipconnection}
+            {error, no_service_url}
+    end.
+
+get_control_url(Url, RootUrl) ->
+    case split(RootUrl, "://") of
+        [Scheme, Rest] ->
+            case split(Rest, "/") of
+                [NetLoc| _] ->
+                    CtlUrl = Scheme ++ "://" ++ NetLoc ++ Url,
+                    {ok, CtlUrl};
+                _Else ->
+                    {error, invalid_control_url}
+            end;
+        _Else ->
+            {error, invalid_control_url}
     end.
 
 
