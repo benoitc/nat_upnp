@@ -211,7 +211,7 @@ get_wan_device(D, RootUrl) ->
         {ok, D1} ->
             get_connection_device(D1, RootUrl);
         _ ->
-            {erro, no_wan_device}
+            {error, no_wan_device}
     end.
 
 get_connection_device(D, RootUrl) ->
