@@ -74,6 +74,6 @@ $ make devclean ; # clean all files
 
 
 <table width="100%" border="0" summary="list of modules">
-<tr><td><a href="nat_upnp.md" class="module">nat_upnp</a></td></tr>
-<tr><td><a href="nat_upnp_proto.md" class="module">nat_upnp_proto</a></td></tr></table>
+<tr><td><a href="http://github.com/benoitc/nat_upnp/blob/master/doc/nat_upnp.md" class="module">nat_upnp</a></td></tr>
+<tr><td><a href="http://github.com/benoitc/nat_upnp/blob/master/doc/nat_upnp_proto.md" class="module">nat_upnp_proto</a></td></tr></table>
 

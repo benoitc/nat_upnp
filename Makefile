@@ -7,12 +7,14 @@ DEPS = inet_ext
 dep_inet_ext = git https://github.com/benoitc/inet_ext 0.3.2
 
 DOC_DEPS = edown
-EDOC_OPTS = {doclet, edown_doclet}
+EDOC_OPTS = {doclet, edown_doclet}, \
+			{top_level_readme, {"./README.md", "http://github.com/benoitc/nat_upnp"}}
+
+
 
 all:: deps app rel
 
 doc: edoc
-	cp doc/README.md .
 
 distclean:: distclean-edown
 
