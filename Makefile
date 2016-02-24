@@ -1,35 +1,24 @@
-REBAR?=./rebar
+PROJECT=nat_upnp
+PROJECT_DESCRIPTION=library to use UPnP to be able to forward ports
+PROJECT_VERSION=0.1
 
-all: build
+DEPS = inet_ext
 
-dev: devbuild
+dep_inet_ext = git https://github.com/benoitc/inet_ext 0.3.2
 
-doc: dev
-	$(REBAR) -C rebar_dev.config doc
+DOC_DEPS = edown
+EDOC_OPTS = {doclet, edown_doclet}
 
-clean:
-	$(REBAR) clean
+all:: deps app rel
 
-distclean: clean
-	@rm -rf deps
+doc: edoc
+	cp doc/README.md .
 
-build: deps
-	$(REBAR) compile
+distclean:: distclean-edown
 
-deps:
-	$(REBAR) get-deps
+distclean-edown:
+	rm -rf doc/*.md
 
+app:: rebar.config
 
-# development
-#
-devclean:
-	$(REBAR) -C rebar_dev.config clean
-
-devbuild: devdeps
-	$(REBAR) -C rebar_dev.config compile
-
-devdeps:
-	$(REBAR) -C rebar_dev.config get-deps
-
-
-.PHONY: doc deps
+include erlang.mk

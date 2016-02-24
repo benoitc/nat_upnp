@@ -5,8 +5,6 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
-
 <a name="types"></a>
 
 ## Data Types ##
@@ -17,11 +15,9 @@
 ### <a name="type-nat_upnp">nat_upnp()</a> ###
 
 
-
 <pre><code>
 nat_upnp() = #nat_upnp{}
 </code></pre>
-
 
 <a name="index"></a>
 
@@ -41,13 +37,11 @@ nat_upnp() = #nat_upnp{}
 
 `add_port_mapping(Nat_upnp, Protocol0, ExternalPort, InternalPort, Description, Timeout) -> any()`
 
-
 <a name="delete_port_mapping-3"></a>
 
 ### delete_port_mapping/3 ###
 
 `delete_port_mapping(Nat_upnp, Protocol0, ExternalPort) -> any()`
-
 
 <a name="discover-0"></a>
 
@@ -55,18 +49,15 @@ nat_upnp() = #nat_upnp{}
 
 `discover() -> any()`
 
-
 <a name="discover-1"></a>
 
 ### discover/1 ###
 
 `discover(Timeout) -> any()`
 
-
 <a name="status_info-1"></a>
 
 ### status_info/1 ###
 
 `status_info(Nat_upnp) -> any()`
-
 

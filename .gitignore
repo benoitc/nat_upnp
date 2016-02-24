@@ -1,6 +1,7 @@
-ebin
-*.beam
-*.sw*
+.erlang.mk
+nat_upnp.d
+ebin/*.beam
 deps
-.DS_Store
-erl_crash.dump
+test/*.tmp
+test/*.beam
+.rebar

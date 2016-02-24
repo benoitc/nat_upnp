@@ -29,7 +29,7 @@ discover() ->
     discover(?DEFAULT_TIMEOUT).
 
 discover(Timeout) ->
-    nat_upnp_util:require([inets]),
+    _ = application:start(inets),
 
     {ok, Sock} = gen_udp:open(0, [{active, once}, inet, binary]),
 
@@ -174,7 +174,7 @@ soap_request(Url, Function, Msg0) ->
 
 
 get_myip(Ip) ->
-    [{_, {MyIp, _}}|_] = nat_upnp_util:route(Ip),
+    [{_, {MyIp, _}}|_] = inet_ext:route(Ip),
     inet_parse:ntoa(MyIp).
 
 get_location(Raw) ->
