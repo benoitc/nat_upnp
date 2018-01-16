@@ -11,7 +11,8 @@
          discover/1,
          status_info/1,
          add_port_mapping/4, add_port_mapping/5, add_port_mapping/6,
-         delete_port_mapping/3]).
+         delete_port_mapping/3,
+         get_external_ip_address/1]).
 
 
 -type protocol() :: tcp | udp.
@@ -76,3 +77,7 @@ add_port_mapping(Context, Protocol, ExternalPort, InternalPort,
     -> ok | {error, term()}.
 delete_port_mapping(Context, Protocol, ExternalPort) ->
     nat_upnp_proto:delete_port_mapping(Context, Protocol, ExternalPort).
+
+-spec get_external_ip_address(Context :: nat_upnp_proto:nat_upnp()) -> term().
+get_external_ip_address(Context) ->
+    nat_upnp_proto:get_external_ip_address(Context).

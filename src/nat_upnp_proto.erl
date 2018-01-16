@@ -13,7 +13,8 @@
          discover/1,
          status_info/1,
          add_port_mapping/6,
-         delete_port_mapping/3]).
+         delete_port_mapping/3,
+         get_external_ip_address/1]).
 
 -record(nat_upnp, {
         service_url,
@@ -247,6 +248,21 @@ get_connection_url(D, RootUrl) ->
             {error, no_wanipconnection}
     end.
 
+get_external_ip_address(#nat_upnp{service_url=Url}) ->
+    Message = "<u:GetExternalIPAddress xmlns:u=\"urn:schemas-upnp-org:service:WANIPConnection:1\" />",
+    case soap_request(Url, "GetExternalIPAddress", Message) of
+        {ok, Body} ->
+            {Xml, _} = xmerl_scan:string(Body, [{space, normalize}]),
+            [Infos | _] = xmerl_xpath:string("//s:Envelope/s:Body/"
+                                             "u:GetExternalIPAddressResponse", Xml),
+            NewExternalIPAddress = extract_txt(
+                    xmerl_xpath:string("NewExternalIPAddress/text()",
+                                       Infos)
+                    ),
+            {ok, NewExternalIPAddress};
+        Error ->
+            Error
+    end.
 
 get_device(Device, DeviceType) ->
     DeviceList = xmerl_xpath:string("deviceList/device", Device),
