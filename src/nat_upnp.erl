@@ -78,6 +78,7 @@ add_port_mapping(Context, Protocol, ExternalPort, InternalPort,
 delete_port_mapping(Context, Protocol, ExternalPort) ->
     nat_upnp_proto:delete_port_mapping(Context, Protocol, ExternalPort).
 
--spec get_external_ip_address(Context :: nat_upnp_proto:nat_upnp()) -> term().
+%% @doc Get external IP address from the router
+-spec get_external_ip_address(Context :: nat_upnp_proto:nat_upnp()) -> {ok, list()} | {error, term()}.
 get_external_ip_address(Context) ->
     nat_upnp_proto:get_external_ip_address(Context).
