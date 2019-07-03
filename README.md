@@ -1,3 +1,13 @@
+** DEPRECATED ** Please look at https://github.com/benoitc/erlang-nat to replace it.
+
+
+
+
+
+
+
+
+
 
 
 # nat_upnp - Make your port public using UNP #
