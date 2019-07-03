@@ -1,4 +1,4 @@
-** DEPRECATED ** Please look at https://github.com/benoitc/erlang-nat to replace it.
+** **DEPRECATED** ** Please look at https://github.com/benoitc/erlang-nat to replace it.
 
 
 
